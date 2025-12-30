@@ -100,7 +100,7 @@ always @ (posedge iSysClk or negedge iRst_N) begin
   if (!iRst_N) begin
     wTempDataAddr <= 'b0;
   end
-  else if (fsmCurState != P_IDLE) begin
+  else if (fsmCurState == P_IDLE) begin                           //感觉这行改成==
     // when get into WGT_CONFIG or NET_INFER
     wTempDataAddr <= 'b0;
   end
@@ -120,11 +120,12 @@ end
 reg  [3:0] SingleSendCNT;
 wire [127:0] SendData128b;
 
+
 always @(posedge iSysClk or negedge iRst_N) begin
   if (!iRst_N) begin
     SingleSendCNT <= 'b0;
   end
-  else if ((fsmCurState!=P_IDLE) && (iReady==9'b1_1111_1111)) begin
+  else if ((fsmCurState!=P_IDLE) && (iReady==9'b1_1111_1111)) begin            //感觉此处添加一个条件，wTempDataAddr ！= 0 ，可以保证读数的时候存储不为空
     SingleSendCNT <= SingleSendCNT + 1'b1;
   end
   else if (SingleSendCNT == 4'd15) begin
@@ -138,15 +139,15 @@ always @(posedge iSysClk or negedge iRst_N) begin
   if (!iRst_N) begin
     rTempDataAddr <= 'b0;
   end
-  else if (SingleSendCNT == 4'd15) begin
-    // all 128bit data has been transfered to opu_top(s)
-    rTempDataAddr <= rTempDataAddr + 1'b1;
-  end
   else if ((fsmCurState == P_WGT_CONFIG)&&(rTempDataAddr==`WgtDataLength-1)&&(SingleSendCNT == 4'd15)) begin
     rTempDataAddr <= 'b0;
   end
   else if ((fsmCurState == P_NET_INFER)&&(rTempDataAddr==`SampleDataLength-1)&&(SingleSendCNT == 4'd15)) begin
     rTempDataAddr <= 'b0;
+  end
+  else if (SingleSendCNT == 4'd15) begin
+  // all 128bit data has been transfered to opu_top(s)
+  rTempDataAddr <= rTempDataAddr + 1'b1;
   end
 end
 
@@ -154,35 +155,68 @@ end
 // 给每个OPU依次发送所有的激励值！！！
 reg [3:0] ActTransOpuIndex; // means which opu is receiving Act Data
 
-always @(posedge iSysClk or negedge iRst_N) begin
+// always @(posedge iSysClk or negedge iRst_N) begin                            //感觉每个条件都改为（192的整数倍减一）&& SingleSendCNT==15
+//   if (!iRst_N) begin
+//     ActTransOpuIndex <= 'b0;
+//   end
+//   else if (rTempDataAddr==16'd192) begin
+//     ActTransOpuIndex <= 4'd1;
+//   end
+//   else if (rTempDataAddr==16'd384) begin
+//     ActTransOpuIndex <= 4'd2;
+//   end
+//   else if (rTempDataAddr==16'd576) begin
+//     ActTransOpuIndex <= 4'd3;
+//   end
+//   else if (rTempDataAddr==16'd768) begin
+//     ActTransOpuIndex <= 4'd4;
+//   end
+//   else if (rTempDataAddr==16'd960) begin
+//     ActTransOpuIndex <= 4'd5;
+//   end
+//   else if (rTempDataAddr==16'd1152) begin
+//     ActTransOpuIndex <= 4'd6;
+//   end
+//   else if (rTempDataAddr==16'd1344) begin
+//     ActTransOpuIndex <= 4'd7;
+//   end
+//   else if (rTempDataAddr==16'd1536) begin
+//     ActTransOpuIndex <= 4'd8;
+//   end
+//   else if (rTempDataAddr>=16'd1728) begin
+//     ActTransOpuIndex <= 4'd0;
+//   end
+// end
+
+always @(posedge iSysClk or negedge iRst_N) begin                            
   if (!iRst_N) begin
     ActTransOpuIndex <= 'b0;
   end
-  else if (rTempDataAddr==16'd192) begin
+  else if ((rTempDataAddr == 16'd191) && (SingleSendCNT == 4'd15)) begin
     ActTransOpuIndex <= 4'd1;
   end
-  else if (rTempDataAddr==16'd384) begin
+  else if ((rTempDataAddr == 16'd383) && (SingleSendCNT == 4'd15)) begin
     ActTransOpuIndex <= 4'd2;
   end
-  else if (rTempDataAddr==16'd576) begin
+  else if ((rTempDataAddr == 16'd575) && (SingleSendCNT == 4'd15)) begin
     ActTransOpuIndex <= 4'd3;
   end
-  else if (rTempDataAddr==16'd768) begin
+  else if ((rTempDataAddr == 16'd767) && (SingleSendCNT == 4'd15)) begin
     ActTransOpuIndex <= 4'd4;
   end
-  else if (rTempDataAddr==16'd960) begin
+  else if ((rTempDataAddr == 16'd959) && (SingleSendCNT == 4'd15)) begin
     ActTransOpuIndex <= 4'd5;
   end
-  else if (rTempDataAddr==16'd1152) begin
+  else if ((rTempDataAddr == 16'd1151) && (SingleSendCNT == 4'd15)) begin
     ActTransOpuIndex <= 4'd6;
   end
-  else if (rTempDataAddr==16'd1344) begin
+  else if ((rTempDataAddr == 16'd1343) && (SingleSendCNT == 4'd15)) begin
     ActTransOpuIndex <= 4'd7;
   end
-  else if (rTempDataAddr==16'd1536) begin
+  else if ((rTempDataAddr == 16'd1535) && (SingleSendCNT == 4'd15)) begin
     ActTransOpuIndex <= 4'd8;
   end
-  else if (rTempDataAddr>=16'd1728) begin
+  else if (rTempDataAddr >= 16'd1728) begin
     ActTransOpuIndex <= 4'd0;
   end
 end
@@ -194,48 +228,48 @@ always @(posedge iSysClk or negedge iRst_N) begin
   if(!iRst_N) begin
     oData <= 'b0;
   end
-  else if ((fsmCurState==P_WGT_CONFIG) && (iReady==9'b1_1111_1111)) begin
+  else if ((fsmCurState==P_WGT_CONFIG) && (iReady==9'b1_1111_1111)) begin              //改成9？ 感觉应该配合128行wTempDataAddr ！= 0 
     // when all OPU_tops are ready, send them equal data
     case (SingleSendCNT)
-      4'd0:    oData <= {8{SendData128b[    7:0]}};
-      4'd1:    oData <= {8{SendData128b[   15:8]}};
-      4'd2:    oData <= {8{SendData128b[  23:16]}};
-      4'd3:    oData <= {8{SendData128b[  31:24]}};
-      4'd4:    oData <= {8{SendData128b[  39:32]}};
-      4'd5:    oData <= {8{SendData128b[  47:40]}};
-      4'd6:    oData <= {8{SendData128b[  55:48]}};
-      4'd7:    oData <= {8{SendData128b[  63:56]}};
-      4'd8:    oData <= {8{SendData128b[  71:64]}};
-      4'd9:    oData <= {8{SendData128b[  79:72]}};
-      4'd10:   oData <= {8{SendData128b[  87:80]}};
-      4'd11:   oData <= {8{SendData128b[  95:88]}};
-      4'd12:   oData <= {8{SendData128b[ 103:96]}};
-      4'd13:   oData <= {8{SendData128b[111:104]}};
-      4'd14:   oData <= {8{SendData128b[119:112]}};
-      4'd15:   oData <= {8{SendData128b[127:120]}};
+      4'd0:    oData <= {9{SendData128b[    7:0]}};
+      4'd1:    oData <= {9{SendData128b[   15:8]}};
+      4'd2:    oData <= {9{SendData128b[  23:16]}};
+      4'd3:    oData <= {9{SendData128b[  31:24]}};
+      4'd4:    oData <= {9{SendData128b[  39:32]}};
+      4'd5:    oData <= {9{SendData128b[  47:40]}};
+      4'd6:    oData <= {9{SendData128b[  55:48]}};
+      4'd7:    oData <= {9{SendData128b[  63:56]}};
+      4'd8:    oData <= {9{SendData128b[  71:64]}};
+      4'd9:    oData <= {9{SendData128b[  79:72]}};
+      4'd10:   oData <= {9{SendData128b[  87:80]}};
+      4'd11:   oData <= {9{SendData128b[  95:88]}};
+      4'd12:   oData <= {9{SendData128b[ 103:96]}};
+      4'd13:   oData <= {9{SendData128b[111:104]}};
+      4'd14:   oData <= {9{SendData128b[119:112]}};
+      4'd15:   oData <= {9{SendData128b[127:120]}};
       default: oData <= 'b0;
     endcase
 
-    oDataValid <= {9{1'b1}};
+    oDataValid <= {9{1'b1}};                                          //感觉oDataValid信号需要有发完数据归零的逻辑。
   end
   else if ((fsmCurState==P_NET_INFER)&& (iReady==9'b1_1111_1111)) begin
     case (SingleSendCNT)
-      4'd0:    oData <= {8{SendData128b[    7:0]}};
-      4'd1:    oData <= {8{SendData128b[   15:8]}};
-      4'd2:    oData <= {8{SendData128b[  23:16]}};
-      4'd3:    oData <= {8{SendData128b[  31:24]}};
-      4'd4:    oData <= {8{SendData128b[  39:32]}};
-      4'd5:    oData <= {8{SendData128b[  47:40]}};
-      4'd6:    oData <= {8{SendData128b[  55:48]}};
-      4'd7:    oData <= {8{SendData128b[  63:56]}};
-      4'd8:    oData <= {8{SendData128b[  71:64]}};
-      4'd9:    oData <= {8{SendData128b[  79:72]}};
-      4'd10:   oData <= {8{SendData128b[  87:80]}};
-      4'd11:   oData <= {8{SendData128b[  95:88]}};
-      4'd12:   oData <= {8{SendData128b[ 103:96]}};
-      4'd13:   oData <= {8{SendData128b[111:104]}};
-      4'd14:   oData <= {8{SendData128b[119:112]}};
-      4'd15:   oData <= {8{SendData128b[127:120]}};
+      4'd0:    oData <= {9{SendData128b[    7:0]}};
+      4'd1:    oData <= {9{SendData128b[   15:8]}};
+      4'd2:    oData <= {9{SendData128b[  23:16]}};
+      4'd3:    oData <= {9{SendData128b[  31:24]}};
+      4'd4:    oData <= {9{SendData128b[  39:32]}};
+      4'd5:    oData <= {9{SendData128b[  47:40]}};
+      4'd6:    oData <= {9{SendData128b[  55:48]}};
+      4'd7:    oData <= {9{SendData128b[  63:56]}};
+      4'd8:    oData <= {9{SendData128b[  71:64]}};
+      4'd9:    oData <= {9{SendData128b[  79:72]}};
+      4'd10:   oData <= {9{SendData128b[  87:80]}};
+      4'd11:   oData <= {9{SendData128b[  95:88]}};
+      4'd12:   oData <= {9{SendData128b[ 103:96]}};
+      4'd13:   oData <= {9{SendData128b[111:104]}};
+      4'd14:   oData <= {9{SendData128b[119:112]}};
+      4'd15:   oData <= {9{SendData128b[127:120]}};
       default: oData <= 'b0;
     endcase
     
